@@ -24,6 +24,17 @@ function _init()
 	tglob=0
 	phase='nul'
 	set_phase('game')
+	init_handle_crts()
+end
+function init_handle_crts()
+	crts={}
+end
+function gupdate()
+	move_player()
+	attack_player()
+	run_sprs_scripts()
+	solve_colls(sprs, blks)
+ solve_colls(sprs, sprs)
 end
 function get_phase()
 	return phases[phase]	
@@ -123,31 +134,7 @@ function tdraw()
 	ttrans+=1
 end
 -->8
--- game phase data & inits
-function ginit()
-	acdown=0
-	canmove=true
-	btnos={
-		false,false,
-		false,false,
-		false,false,
-	}
-	init_sprites()
-	init_blocks()
-	init_music()
-	init_handle_crts()
-	dialog(
-		plyr, 
-		'hey mom!'
-	)
-end
-function init_handle_crts()
-	crts={}
-end
-function init_blocks()
-	blks={}
-	convert_blocks(0,0)
-end
+-- inits & coroutines
 function init_phases()
 	phases={
 		logo={
@@ -181,125 +168,6 @@ function init_phases()
 			updtfn=pass
 		}
 	}
-end
-function init_sprites()
-	sprs={
-		{
-	 	top=10,
-	 	left=10,
-	 	frame=0, -- 0,1
-	 	dir=0, -- d,u,l,r
-	 	sprp=1, -- sprite index
-	 	mvcnt=0, -- +1 on moving
-	 	ismvn=false,
-	 	static=false, -- non-anim
-	 	collider=0, -- circle, square
-	 	weight=1,
-	 	oncoll=pass,
-	 	oncollentr=pass,
-	 	oncollleav=pass,
-	 	incoll={},
-	 	range=0,
-	 	onrange=pass,
-	 	onrangeentr=pass,
-	 	onrangeleav=pass,
-	 	inrange={}
-	 },
-	}
-	plyr=sprs[1]
-	convert_sprites(0,0)
-end
-function convert_sprites(x,y)
-	for i=x,x+15 do
-		for j=y,y+15 do
-			convert_sprite(i,j)
-		end
-	end
-end
-function convert_blocks(x,y)
-	for i=x,x+15 do
-		for j=y,y+15 do
-			convert_block(i,j)
-		end
-	end
-end
-function convert_sprite(x,y)
-	local si=mget(x,y)
-	if (si<64 and si>0) then
-	 mset(x,y,64)
-	 local s={
-		 top=y*8,
-		 left=x*8,
-		 sprp=si,
-		 static=true,
-		 collider=0,
-		 weight=10,
-	 	oncoll=pass,
-	 	oncollentr=pass,
-	 	oncollleav=pass,
-	 	incoll={},
-	 	range=0,
-	 	onrange=pass,
-	 	onrangeentr=pass,
-	 	onrangeleav=pass,
-	 	inrange={}
-		}
-		add(sprs,s)
-		if(evs['e'..si]) then
-			merge_tbls(
-				s,
-				evs['e'..si]
-			)
-		end
-	end
-end
-function convert_block(x,y)
-	local si=mget(x,y)
-	if (si<128 and si>=80) then
-		mset(x,y,0)
-		local to_add={
-		 top=y*8,
-		 left=x*8,
-		 sprp=si,
-		 static=true,
-		 collider=0,
-		 weight=50,
-		 static=true,
-	 	oncoll=pass,
-	 	oncollentr=pass,
-	 	oncollleav=pass,
-	 	incoll={},
-	 	range=0,
-	 	onrange=pass,
-	 	onrangeentr=pass,
-	 	onrangeleav=pass,
-	 	inrange={}
-		}
-		add(blks,to_add)
-		if(evs['e'..si]) then
-			merge_tbls(
-				to_add,
-				evs['e'..si]
-			)
-		end
-	end
-end
-function merge_tbls(a,b)
-	for k,v in pairs(b) do 
-		a[k] = v
-	end
-end
-function run_sprs_scripts()
-	for s in all(sprs) do
-		if (s.onupdate) s.onupdate(s)
-	end
-end
-function gupdate()
-	move_player()
-	attack_player()
-	run_sprs_scripts()
-	solve_colls(sprs, blks)
- solve_colls(sprs, sprs)
 end
 function handle_crts()
 	for c in all(crts) do
@@ -462,15 +330,12 @@ function _if(bool, func1, func2)
 end
 
 -->8
--- music
-function init_music()
- music(0,4000)
-end
+
 -->8
 -- game phase drawing
 function gdraw()
  cls() --clear screen
- map()
+ map(lvl.xt,lvl.yt)
  draw_blocks()
  draw_sprites()
  handle_crts()
@@ -772,7 +637,7 @@ evs={
 			 music(-1)
 			 canmove=false
 				sfx(17,1)
-				set_phase('glogo')
+				tport(lvls.home)
 			end
 		end,
 		ignphys=true
@@ -864,6 +729,169 @@ function letterc(t,s)
 	else
 		return -1
 	end
+end
+-->8
+--levels
+lvls={
+	home={
+		xt=16,
+		yt=0,
+		mus=-1,
+		deftopt=9,
+		defleftt=7
+	},
+	test={
+		xt=0,
+		yt=0,
+		mus=0,
+		deftopt=3,
+		defleftt=3
+	},
+}
+lvl=lvls.test
+
+function ginit()
+	acdown=0
+	canmove=true
+	btnos={
+		false,false,
+		false,false,
+		false,false,
+	}
+	init_sprites(lvl)
+	init_blocks(lvl)
+	init_music(lvl)
+end
+function init_blocks(lvl)
+	blks={}
+	convert_blocks(lvl)
+end
+function init_sprites(lvl)
+	-- destroy all sprites
+	sprs={
+		{
+	 	top=lvl.deftopt*8,
+	 	left=lvl.defleftt*8,
+	 	frame=0, -- 0,1
+	 	dir=0, -- d,u,l,r
+	 	sprp=1, -- sprite index
+	 	mvcnt=0, -- +1 on moving
+	 	ismvn=false,
+	 	static=false, -- non-anim
+	 	collider=0, -- circle, square
+	 	weight=1,
+	 	oncoll=pass,
+	 	oncollentr=pass,
+	 	oncollleav=pass,
+	 	incoll={},
+	 	range=0,
+	 	onrange=pass,
+	 	onrangeentr=pass,
+	 	onrangeleav=pass,
+	 	inrange={}
+	 },
+	}
+	plyr=sprs[1]
+	convert_sprites(lvl)
+end
+function init_music(lvl)
+	add_crt(function()
+		music(-1,500)
+		for i=1,60 do
+			yield()
+		end
+		music(lvl.mus,500)
+	end)
+ 
+end
+function convert_sprites(lvl)
+	for i=lvl.xt,lvl.xt+15 do
+		for j=lvl.yt,lvl.yt+15 do
+			convert_sprite(i,j,lvl)
+		end
+	end
+end
+function convert_blocks(lvl)
+	for i=lvl.xt,lvl.xt+15 do
+		for j=lvl.yt,lvl.yt+15 do
+			convert_block(i,j,lvl)
+		end
+	end
+end
+function convert_sprite(x,y,lvl)
+	local si=mget(x,y)
+	if (si<64 and si>0) then
+	 mset(x,y,64)
+	 local s={
+		 top=y*8-lvl.yt*8,
+		 left=x*8-lvl.xt*8,
+		 sprp=si,
+		 static=true,
+		 collider=0,
+		 weight=10,
+	 	oncoll=pass,
+	 	oncollentr=pass,
+	 	oncollleav=pass,
+	 	incoll={},
+	 	range=0,
+	 	onrange=pass,
+	 	onrangeentr=pass,
+	 	onrangeleav=pass,
+	 	inrange={}
+		}
+		add(sprs,s)
+		if(evs['e'..si]) then
+			merge_tbls(
+				s,
+				evs['e'..si]
+			)
+		end
+	end
+end
+function convert_block(x,y,lvl)
+	local si=mget(x,y)
+	if (si<128 and si>=80) then
+		mset(x,y,0)
+		local to_add={
+			top=y*8-lvl.yt*8,
+		 left=x*8-lvl.xt*8,
+		 sprp=si,
+		 static=true,
+		 collider=0,
+		 weight=50,
+		 static=true,
+	 	oncoll=pass,
+	 	oncollentr=pass,
+	 	oncollleav=pass,
+	 	incoll={},
+	 	range=0,
+	 	onrange=pass,
+	 	onrangeentr=pass,
+	 	onrangeleav=pass,
+	 	inrange={}
+		}
+		add(blks,to_add)
+		if(evs['e'..si]) then
+			merge_tbls(
+				to_add,
+				evs['e'..si]
+			)
+		end
+	end
+end
+function merge_tbls(a,b)
+	for k,v in pairs(b) do 
+		a[k] = v
+	end
+end
+function run_sprs_scripts()
+	for s in all(sprs) do
+		if (s.onupdate) s.onupdate(s)
+	end
+end
+function tport(l)
+	lvl=l
+	set_phase('game')
 end
 __gfx__
 00000000047aaa40047aaa4004a7aa4004a7aa4007aaa94007aaa940024444200244442002494420024944200944442009444420000000000000000000000000
@@ -968,12 +996,12 @@ __map__
 5041414140404041414141404142405000000000575857585556575857000000500000000000000000000000000000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 5041414042404140414041414141405000000000434443434444444444000000500000000000000000000000000000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 5041404141404140414141404141415000000000644359444444514444000000500000000000000000000000000000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-5040414141404107404141414141415000000000444444434343444443000000500000000000000000000000000000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+5040414141404140404141414141415000000000444444434343444443000000500000000000000000000000000000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 5041404141414141414142414140415000000000524452525252525252000000500000000000000000000000000000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 5041404040404062404141404240415000000000544454545454545400000000500000000000000000000000000000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 50414141414141414140414040404150000000005b44575b5657585b00000000500000000000000000000000000000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-504141414140404041414141414141500000000048485a485a485a4800000000500000000000000000000000000000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-5041414041414141414141414041415000000000484848484848484800000000500000000000000000000000000000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+504141414140404041414141404141500000000048485a485a485a4800000000500000000000000000000000000000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+5041414041414141414141410741415000000000484848484848484800000000500000000000000000000000000000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 5041404241404040414141414141415000000000525252525252525200000000500000000000000000000000000000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 5041414040414140404040414142415000000000000000000000000000000000500000000000000000000000000000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 5041414140404141414141414141415000000000000000000000000000000000500000000000000000000000000000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
